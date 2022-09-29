@@ -100,14 +100,33 @@ set telecharge=n
 if %latestversiononline% GTR %build% (
   echo. [96mNouveau build découvert pour la version [95m%version%[96m: [95m%latestversiononline%[0m
   call :playsound
-  ping 127.0.0.1 -n 5 > nul
-  goto download
+  ping 127.0.0.1 -n 2 > nul
+  rem download description
+  rem https://api.papermc.io/v2/projects/paper/versions/1.19.2/builds/177
+  goto descriptions
 )
 if %latestversiononline% == %build% (
   echo. [33mDernier build pour la version [36m%version%[33m: [36m%latestversiononline%[0m
 )
 goto bypasspromptdownload
-
+:descriptions
+echo. [34mChangements dans ce build:[0m
+set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestversiononline%" -H "accept: application/json"'
+rem set commande='curl -s "https://api.papermc.io/v2/projects/paper/versions/1.19.2/builds/177" -H "accept: application/json"'
+rem echo. %com%
+for /F "tokens=2 delims=[" %%a in (%com%) do (
+  for /F "tokens=1 delims=]" %%b in ("%%a") do (
+    for /F "tokens=4 delims=:" %%c in ("%%b") do (
+      for /F "tokens=1 delims=}" %%d in ("%%c") do (
+        set messages=%%d
+      )
+    )
+  )
+)
+echo. %messages%[0m
+echo.
+ping 127.0.0.1 -n 5 > nul
+goto download
 :download
 if %dontprompt% == 1 (
   set telecharge=o
@@ -159,7 +178,7 @@ if %firsttime% == 1 (
 )
 ping 127.0.0.1 -n 3 > nul
 echo.
-echo. [33mDémarrage du serveur paper [36m%version% %build%[33m...[0m
+echo. [34mDémarrage du serveur paper [36m%version% %build%[34m...[0m
 echo.
 ping 127.0.0.1 -n 3 > nul
 rem call "Server MineCraft.bat" %version% %build%
