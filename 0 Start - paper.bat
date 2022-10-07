@@ -4,7 +4,7 @@ set dontsearch=0
 :firsttime
 chcp 65001 > nul
 chcp 1252 > nul
-set vers=2
+set vers=4
 rem config
 rem %WINDIR%\media\Alarm*.wav
 rem %WINDIR%\media\Ring*.wav
@@ -14,13 +14,18 @@ set dontprompt=1
 set title=Serveur de Nini et Jo
 rem end config
 
-
 set build=0
 set versionfile=paper_version.txt
 set firsttime=0
 SET BINDIR=%~dp0
 CD /D "%BINDIR%"
 Title Flash Server loader V%vers%
+
+rem test
+rem call :descriptions 1.19.2 180
+rem call :downloadpapermc 1.19.2 191
+
+
 if not exist %versionfile% (
   echo.
   echo. [36m***********************************[0m
@@ -85,16 +90,22 @@ rem check sur internet yeah!
 
 if %dontsearch% EQU 1 goto bypasscheck
 echo. [33mVérification en ligne sur [34mpapermc.io[33m...[0m
-set latestversiononline=0
 
+set latestversiononline=0
+set multibuild=0
 set commande='curl -s "https://api.papermc.io/v2/projects/paper/versions/%version%" -H "accept: application/json"'
 for /F "tokens=2 delims=[" %%a in (%commande%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
     for %%c in (%%b) do (
-      set latestversiononline=%%c
+      if %%c GTR %build% (
+        call :multibuilds %build% %%c
+        set latestversiononline=%%c
+      )
     )
   )
 )
+::echo %multibuild%
+
 
 set telecharge=n
 if %latestversiononline% GTR %build% (
@@ -103,60 +114,23 @@ if %latestversiononline% GTR %build% (
   ping 127.0.0.1 -n 2 > nul
   rem download description
   rem https://api.papermc.io/v2/projects/paper/versions/1.19.2/builds/177
-  goto descriptions
+  ::call :descriptions %version% %latestversiononline%
+  echo. [34mChangements dans les derniers builds: [0m
+  call :multiNotes %version% %multibuild%
+  ping 127.0.0.1 -n 5 > nul
+  
+  call :downloadpapermc %version% %latestversiononline%
+  ping 127.0.0.1 -n 4 > nul
+  cls
+  goto firsttime
 )
 if %latestversiononline% == %build% (
   echo. [33mDernier build pour la version [36m%version%[33m: [36m%latestversiononline%[0m
 )
 goto bypasspromptdownload
-:descriptions
-echo. [34mChangements dans ce build:[0m
-set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestversiononline%" -H "accept: application/json"'
-rem set commande='curl -s "https://api.papermc.io/v2/projects/paper/versions/1.19.2/builds/177" -H "accept: application/json"'
-rem echo. %com%
-for /F "tokens=2 delims=[" %%a in (%com%) do (
-  for /F "tokens=1 delims=]" %%b in ("%%a") do (
-    for /F "tokens=4 delims=:" %%c in ("%%b") do (
-      for /F "tokens=1 delims=}" %%d in ("%%c") do (
-        set messages=%%d
-      )
-    )
-  )
-)
-echo. %messages%[0m
-echo.
-ping 127.0.0.1 -n 5 > nul
-goto download
-:download
-if %dontprompt% == 1 (
-  set telecharge=o
-  goto bypasspromptdownload
-)
-echo. [33mVoulez-vous acquerir le fichier:[0m
-choice /C on /T 20 /D o /M ""
-IF %ERRORLEVEL% EQU 2 set telecharge=n
-IF %ERRORLEVEL% EQU 1 set telecharge=o
-IF %ERRORLEVEL% EQU 0 set telecharge=n
 
-:bypasspromptdownload
-set fich=paper-%version%-%latestversiononline%.jar
-IF %telecharge% == o (
-  echo. [36mTéléchargement en cour...[0m
-  curl -s -A "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64)" -H "accept: application/json" -L "https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestversiononline%/downloads/%fich%" -o "%BINDIR%%fich%"
-  ping 127.0.0.1 -n 3 > nul
-  if exist %BINDIR%%fich% (
-    echo. [36mNouveau fichier [35m%fich% [36mtélécharger![0m
-    ping 127.0.0.1 -n 3 > nul
-    echo. [92mUn instant s'il vous plaît...[0m
-  )
-  if not exist %BINDIR%%fich% (
-    echo. [91mEchec![0m
-  )
-  ping 127.0.0.1 -n 4 > nul
-  cls
-  set dontsearch=1
-  goto firsttime
-)
+::ici etait downloadpapermc
+
 rem end check online
 :bypasscheck
 if %newversiondetected% == 1 (
@@ -183,9 +157,8 @@ echo.
 ping 127.0.0.1 -n 3 > nul
 rem call "Server MineCraft.bat" %version% %build%
 
-Title %title%
-java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%version%-%build%.jar nogui
-pause
+rem start server
+call :startserver %version% %build%
 EXIT /B 0
 
 :playsound
@@ -220,3 +193,106 @@ echo objFSO.DeleteFile(strScript^)) >%filename%
 start /min %filename%
 ENDLOCAL
 EXIT /B 0
+
+:descriptions
+setlocal EnableDelayedExpansion
+set version=%1
+set build=%2
+echo [35m%build%[34m: [0m
+
+set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%build%" -H "accept: application/json"'
+rem set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/1.19.2/builds/177" -H "accept: application/json"'
+
+for /F "tokens=2 delims=[" %%a in (%com%) do (
+  for /F "tokens=1 delims=]" %%b in ("%%a") do (
+    for /F "tokens=4 delims=:" %%c in ("%%b") do (
+      for /F "tokens=1 delims=}" %%d in ("%%c") do (
+        set messages=%%d
+      )
+    )
+  )
+)
+set n=^&echo. 
+set messages=%messages:(=%
+set messages=%messages:)=%
+set messages=%messages:"=%
+set messages=%messages:\r=%
+set messages=%messages:\n=!n!%
+::display message
+echo. %messages%
+
+rem si il y des  () dans le message cela bug!
+::for /F "delims=" %%a in (%messages%) do (
+::  echo. %%a[0m
+::)
+endlocal
+EXIT /B 0
+
+:startserver
+Title %title%
+setlocal
+set version=%1
+set build=%2
+java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%version%-%build%.jar nogui
+endlocal
+pause
+EXIT /B 0
+
+::Start donwloadpapermc
+:downloadpapermc
+
+set version=%1
+set build=%2
+IF %dontprompt% == 1 (
+  set telecharge=o
+  goto bypasspromptdownload
+)
+
+echo. [33mVoulez-vous acquerir le fichier:[0m
+
+choice /C on /T 20 /D o /M ""
+IF %ERRORLEVEL% EQU 2 set telecharge=n
+IF %ERRORLEVEL% EQU 1 set telecharge=o
+IF %ERRORLEVEL% EQU 0 set telecharge=n
+
+:bypasspromptdownload
+
+rem set fich=paper-%version%-%latestversiononline%.jar
+set fich=paper-%version%-%build%.jar
+set url="https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%build%/downloads/%fich%"
+IF %telecharge% == o (
+  rem set url=https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestversiononline%/downloads/%fich%
+  echo. [36mTéléchargement en cour...[0m
+  ::echo %url%
+  ::echo %fich%
+  curl -s -A "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64)" -H "accept: application/json" -L %url% -o "%BINDIR%%fich%"
+  ping 127.0.0.1 -n 5 > nul
+  if exist %BINDIR%%fich% (
+    echo. [36mNouveau fichier [35m%fich% [36mtélécharger![0m
+    ping 127.0.0.1 -n 3 > nul
+    echo. [92mUn instant s'il vous plaît...[0m
+    set dontsearch=1
+  )
+  if not exist %BINDIR%%fich% (
+    echo. [91mEchec![0m
+  )
+)
+EXIT /B 0
+::End donwloadpapermc
+:multibuilds
+if %multibuild% GTR 0 (
+  set multibuild=%multibuild%-%2
+)
+if %multibuild% EQU 0 set multibuild=%2
+EXIT /B 0
+
+:multiNotes
+setlocal ENABLEDELAYEDEXPANSION
+set ver=%1
+set versions=%2
+set versions=!versions:-= !
+FOR %%a in (%versions%) do (
+  call :descriptions %ver% %%a
+  ping 127.0.0.1 -n 3 > nul
+)
+endlocal
