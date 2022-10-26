@@ -4,26 +4,29 @@ set dontsearch=0
 :firsttime
 chcp 65001 > nul
 chcp 1252 > nul
-set vers=6
 rem config
 rem %WINDIR%\media\Alarm*.wav
 rem %WINDIR%\media\Ring*.wav
+set vers=7
 set newversionfound_randomsong=%WINDIR%\media\Alarm*.wav
 set version=1.19.2
 set dontprompt=1
+set latestnewsinfileandanotherscreen=1
 set title=Serveur de Nini et Jo
 rem end config
 
 set build=0
 set versionfile=paper_version.txt
+set latestnewsfile=paper_latestnews.bat
 set firsttime=0
 SET BINDIR=%~dp0
 CD /D "%BINDIR%"
 Title Flash Server loader V%vers%
 
 rem test
-rem call :descriptions 1.19.2 136
+rem call :descriptions 1.19.2 224 0
 rem call :downloadpapermc 1.19.2 191
+rem echo fin
 rem pause
 
 if not exist %versionfile% (
@@ -78,9 +81,23 @@ if %latestversiononline% GTR %build% (
   echo. [96mNouveau build découvert pour la version [95m%version%[96m: [95m%latestversiononline%[0m
   call :playsound
   call :pause 3
-  echo. [34mChangements dans les derniers builds: [0m
+  if %latestnewsinfileandanotherscreen% == 1 (
+    (
+      echo ^@echo off
+      echo ^chcp 65001 ^> nul
+      echo ^chcp 1252 ^> nul
+      echo ^echo Nouveautés
+    )>%latestnewsfile%
+    echo. [34mÉcriture dans le fichier [35m%latestnewsfile%[36m %multibuild%[34... [0m
+  )
+  if %latestnewsinfileandanotherscreen% == 0 echo. [34mChangements dans les derniers builds: [0m
   call :pause 2
-  call :multiNotes %version% %multibuild%
+  call :multiNotes %version% %multibuild% %latestnewsinfileandanotherscreen%
+  if %latestnewsinfileandanotherscreen% == 1 (
+    echo ^pause>>%latestnewsfile%
+    echo ^exit>>%latestnewsfile%
+    start /wait "Latest news" %latestnewsfile%
+  )
   call :pause 5
   call :downloadpapermc %version% %latestversiononline%
   call :pause 2
@@ -200,15 +217,15 @@ EXIT /B %bd%
 setlocal EnableDelayedExpansion
 set version=%1
 set build=%2
-
-echo [35m%build%[34m: [0m
+set latest=%3
+if %latest% == 1 echo ^echo [33m%build%[0m:>>%latestnewsfile%
+if %latest% == 0 echo. [35m%build%[34m: [0m
 set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%build%" -H "accept: application/json"'
 for /F "tokens=2 delims=[" %%a in (%com%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
-    ::ca bug ici
     for /F "tokens=4* delims=:" %%c in ("%%b") do (
-      for /F "tokens=1 delims=}" %%d in ("%%c%%d") do (
-        set messages=%%d
+      for /F "tokens=1 delims=}" %%e in ("%%c%%d") do (
+        set messages=%%e
       )
     )
   )
@@ -218,22 +235,40 @@ IF [!messages!] == [] (
   EXIT /B 1
 )
 ::replace \n by ^&echo.^and remove \r
-set n=^&echo. 
+set messages=%messages:&=and%
 set messages=%messages:>=%
 set messages=%messages:<=%
-set messages=%messages:"=%
 set messages=%messages:(=%
 set messages=%messages:)=%
 set messages=%messages:\r=%
-set messages=%messages:\n=!n!%
+set messages=%messages:"=%
+rem echo %build% !messages!
 
+if %latest% == 0 ( 
+  set n=^&echo.
+  set messages=!messages:\n\n=\n!
+  set messages=!messages:\n=%n%!
+)
 ::display message
-echo. %messages%
-rem si il y des  () dans le message cela bug!
-::for /F "delims=" %%a in (%messages%) do (
-::  echo. %%a[0m
-::)
+
+if %latest% == 1 ( 
+  set mess=!messages:\n\n=\n!
+  set mess=!mess:\n=_!
+  call :writenewstofile "!mess!"
+)
+
+if %latest% == 0 echo %messages%
 endlocal
+EXIT /B 0
+
+:writenewstofile
+for /F "tokens=1* delims=_" %%a in ("%~1") do (
+  echo ^echo. %%a>>%latestnewsfile%
+  if not "%%b" == "" call :writenewstofile "%%b"
+rem add space to .txt
+rem if "%%b" == "" echo. >> %latestnewsfile%
+)
+
 EXIT /B 0
 
 :startserver
@@ -244,7 +279,7 @@ set build=%2
 echo.
 echo. [34mDémarrage du serveur paper [36m%version% %build%[34m...[0m
 echo.
-call :pause 3
+call :pause 2
 java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%version%-%build%.jar nogui
 endlocal
 pause
@@ -280,6 +315,7 @@ IF %telecharge% == o (
     echo. [36mNouveau fichier [35m%fich% [36mtélécharger![0m
     call :pause 3
     echo. [92mUn instant s'il vous plaît...[0m
+    call :pause 1
     set dontsearch=1
   )
   if not exist %BINDIR%%fich% (
@@ -299,6 +335,7 @@ EXIT /B 0
 setlocal EnableDelayedExpansion
 set ver=%1
 set versions=%2
+set latest=%3
 IF [%1] == [] (
   echo [31mErreur 1 null![0m
   EXIT /B 1
@@ -309,8 +346,8 @@ IF [%2] == [] (
 )
 set versions=!versions:-= !
 FOR %%a in (%versions%) do (
-  call :descriptions %ver% %%a
-  call :pause 1
+  call :descriptions %ver% %%a %latest%
+  if %latest% == 0 call :pause 2
 )
 endlocal
 EXIT /B 0
