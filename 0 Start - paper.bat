@@ -24,7 +24,7 @@ CD /D "%BINDIR%"
 Title Flash Server loader V%vers%
 
 rem test
-rem call :descriptions 1.19.2 224 0
+rem call :descriptions 1.19.2 244 0
 rem call :downloadpapermc 1.19.2 191
 rem echo fin
 rem pause
@@ -37,6 +37,7 @@ if not exist %versionfile% (
   echo. [36m***********************************[0m
   echo.
   type nul >%versionfile%
+  echo %version% 0>%versionfile%
   set firsttime=1
   call :pause 4
 )
@@ -55,7 +56,7 @@ set fichierActuel=paper-%version%-%build%.jar
 call :pause 2
 set filefound=0
 ::ici etait local check
-call :checklocalversion
+call :checklocalversion %build%
 ::end
 if %filefound% == 0 (
   cls
@@ -70,15 +71,15 @@ if %filefound% == 0 (
 rem check sur internet yeah!
 
 if %dontsearch% EQU 1 goto bypasscheck
-set latestversiononline=0
+set latestbuildonline=0
 call :checkonlinebuild %version% %build%
-set latestversiononline=%errorlevel%
+set latestbuildonline=%errorlevel%
 
 ::ici etait checkonline
 set telecharge=n
 
-if %latestversiononline% GTR %build% (
-  echo. [96mNouveau build découvert pour la version [95m%version%[96m: [95m%latestversiononline%[0m
+if %latestbuildonline% GTR %build% (
+  echo. [96mNouveau build découvert pour la version [95m%version%[96m: [95m%latestbuildonline%[0m
   call :playsound
   call :pause 3
   if %latestnewsinfileandanotherscreen% == 1 (
@@ -96,20 +97,20 @@ if %latestversiononline% GTR %build% (
   if %latestnewsinfileandanotherscreen% == 1 (
     echo ^pause>>%latestnewsfile%
     echo ^exit>>%latestnewsfile%
-    start /wait "Latest news" %latestnewsfile%
+    @start /wait "Latest news" %latestnewsfile%
   )
-  call :pause 5
-  call :downloadpapermc %version% %latestversiononline%
+  call :pause 1
+  call :downloadpapermc %version% %latestbuildonline%
   call :pause 2
-  rem call :checklocalversion
-  rem call :pause 2
+  call :checklocalversion %build%
+  call :pause 2
   cls
-  rem call :title 1
-  goto firsttime
+  call :title 1
+  rem goto firsttime
 )
 
-if %latestversiononline% == %build% (
-  echo. [33mDernier build pour la version [36m%version%[33m: [36m%latestversiononline%[0m
+if %latestbuildonline% == %build% (
+  echo. [33mDernier build pour la version [36m%version%[33m: [36m%latestbuildonline%[0m
 )
 rem goto bypasspromptdownload
 
@@ -125,12 +126,12 @@ if %newversiondetected% == 1 (
   if %firsttime% == 0 echo. [33mEnregistrement de la nouvelle version...[0m
   if %firsttime% == 1 echo. [33mEnregistrement de la version...[0m 
   echo %version% %build%>%versionfile%
-  set firsttime=1
+rem set firsttime=1
 )
 if %firsttime% == 1 (
-  call :pause 5
-  cls
-  goto firsttime
+rem call :pause 5
+rem cls
+rem goto firsttime
 )
 call :pause 3
 ::start server
@@ -172,18 +173,19 @@ EXIT /B 0
 ::playsound end
 ::local check
 :checklocalversion
+set bu=%1
 echo. [33mVérification local...[0m
 FOR %%i IN (paper-*.jar) do (
   if not %%i == %fichierActuel% (
     for /f "tokens=2,3 delims=-" %%a in ("%%~ni") do (
-      if %%b GTR %build% (
+      if %%b GTR %bu% (
         if %firsttime% == 0 echo. [33mNouveau build découvert: [35m%%i[0m
         if %firsttime% == 1 echo. [33mVersion découverte: [35m%%i[0m
         set version=%%a
         set build=%%b
         set newversiondetected=1
       )
-      if %%b LSS %build% (
+      if %%b LSS %bu% (
         echo. [31mEffacement d'ancienne version: [35m%%i[0m
         del "%BINDIR%%%i"
       )
@@ -215,12 +217,12 @@ EXIT /B %bd%
 
 :descriptions
 setlocal EnableDelayedExpansion
-set version=%1
-set build=%2
+set vers=%1
+set bd=%2
 set latest=%3
-if %latest% == 1 echo ^echo [33m%build%[0m:>>%latestnewsfile%
-if %latest% == 0 echo. [35m%build%[34m: [0m
-set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%build%" -H "accept: application/json"'
+if %latest% == 1 echo ^echo [33m%bd%[0m:>>%latestnewsfile%
+if %latest% == 0 echo. [35m%bd%[34m: [0m
+set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%vers%/builds/%bd%" -H "accept: application/json"'
 for /F "tokens=2 delims=[" %%a in (%com%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
     for /F "tokens=4* delims=:" %%c in ("%%b") do (
@@ -274,13 +276,13 @@ EXIT /B 0
 :startserver
 Title %title%
 setlocal
-set version=%1
-set build=%2
+set v=%1
+set b=%2
 echo.
-echo. [34mDémarrage du serveur paper [36m%version% %build%[34m...[0m
+echo. [34mDémarrage du serveur paper [36m%v% %b%[34m...[0m
 echo.
-call :pause 2
-java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%version%-%build%.jar nogui
+call :pause 3
+java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%v%-%b%.jar nogui
 endlocal
 pause
 EXIT /B 0
@@ -303,19 +305,19 @@ IF %ERRORLEVEL% EQU 0 set telecharge=n
 
 :bypasspromptdownload
 
-rem set fich=paper-%version%-%latestversiononline%.jar
+rem set fich=paper-%version%-%latestbuildonline%.jar
 set fich=paper-%version%-%build%.jar
 set url=https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%build%/downloads/%fich%
 IF %telecharge% == o (
-  rem set url=https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestversiononline%/downloads/%fich%
+  rem set url=https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestbuildonline%/downloads/%fich%
   echo. [36mTéléchargement en cour...[0m
   curl -s -A "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64)" -H "accept: application/json" -L "%url%" -o "%BINDIR%%fich%"
-  call :pause 10
+  call :pause 5
   if exist %BINDIR%%fich% (
     echo. [36mNouveau fichier [35m%fich% [36mtélécharger![0m
     call :pause 3
     echo. [92mUn instant s'il vous plaît...[0m
-    call :pause 1
+    call :pause 3
     set dontsearch=1
   )
   if not exist %BINDIR%%fich% (
