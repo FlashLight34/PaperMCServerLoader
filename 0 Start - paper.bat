@@ -9,7 +9,7 @@ rem %WINDIR%\media\Alarm*.wav
 rem %WINDIR%\media\Ring*.wav
 set vers=7
 set newversionfound_randomsong=%WINDIR%\media\Alarm*.wav
-set version=1.19.2
+set version=1.19.4
 set dontprompt=1
 set latestnewsinfileandanotherscreen=1
 set title=Serveur de Nini et Jo
@@ -46,7 +46,7 @@ set /p readversion=< %versionfile%
 set newversiondetected=0
 
 for /F "tokens=1,2 delims= " %%a in ("%readversion%") do (
-  set version=%%a
+  rem set version=%%a
   set build=%%b
 )
 if %firsttime% == 0 (
@@ -99,11 +99,11 @@ if %latestbuildonline% GTR %build% (
     echo ^exit>>%latestnewsfile%
     @start /wait "Latest news" %latestnewsfile%
   )
-  call :pause 1
+  call :pause 2
   call :downloadpapermc %version% %latestbuildonline%
   call :pause 2
   call :checklocalversion %build%
-  call :pause 2
+  call :pause 3
   cls
   call :title 1
   rem goto firsttime
@@ -222,6 +222,7 @@ set bd=%2
 set latest=%3
 if %latest% == 1 echo ^echo [33m%bd%[0m:>>%latestnewsfile%
 if %latest% == 0 echo. [35m%bd%[34m: [0m
+
 set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%vers%/builds/%bd%" -H "accept: application/json"'
 for /F "tokens=2 delims=[" %%a in (%com%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
@@ -232,26 +233,28 @@ for /F "tokens=2 delims=[" %%a in (%com%) do (
     )
   )
 )
+
 IF [!messages!] == [] (
   echo [31mErreur msg is empty![0m
   EXIT /B 1
 )
+
 ::replace \n by ^&echo.^and remove \r
-set messages=%messages:&=and%
-set messages=%messages:>=%
 set messages=%messages:<=%
+set messages=%messages:>=%
+set messages=%messages:&=and%
 set messages=%messages:(=%
 set messages=%messages:)=%
 set messages=%messages:\r=%
 set messages=%messages:"=%
-rem echo %build% !messages!
 
+::direct display
 if %latest% == 0 ( 
   set n=^&echo.
   set messages=!messages:\n\n=\n!
   set messages=!messages:\n=%n%!
 )
-::display message
+::display message in seperate window
 
 if %latest% == 1 ( 
   set mess=!messages:\n\n=\n!
