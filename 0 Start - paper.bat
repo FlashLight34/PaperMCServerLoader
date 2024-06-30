@@ -7,9 +7,9 @@ chcp 1252 > nul
 rem config
 rem %WINDIR%\media\Alarm*.wav
 rem %WINDIR%\media\Ring*.wav
-set vers=7
+set vers=9
 set newversionfound_randomsong=%WINDIR%\media\Alarm*.wav
-set version=1.19.4
+set version=1.20.6
 set dontprompt=1
 set latestnewsinfileandanotherscreen=1
 set title=Serveur de Nini et Jo
@@ -47,8 +47,15 @@ set newversiondetected=0
 
 for /F "tokens=1,2 delims= " %%a in ("%readversion%") do (
   rem set version=%%a
+  if %%a neq %version% (
+    call :title 1
+    echo. [36mChangement de version detecté [96m%%a [36m-[96m %version%[0m
+    call :pause 5
+    goto dontsetbuild
+  )
   set build=%%b
 )
+:dontsetbuild
 if %firsttime% == 0 (
   call :title 1
 )
@@ -79,25 +86,27 @@ set latestbuildonline=%errorlevel%
 set telecharge=n
 
 if %latestbuildonline% GTR %build% (
-  echo. [96mNouveau build découvert pour la version [95m%version%[96m: [95m%latestbuildonline%[0m
-  call :playsound
-  call :pause 3
-  if %latestnewsinfileandanotherscreen% == 1 (
-    (
-      echo ^@echo off
-      echo ^chcp 65001 ^> nul
-      echo ^chcp 1252 ^> nul
-      echo ^echo Nouveautés
-    )>%latestnewsfile%
-    echo. [34mÉcriture dans le fichier [35m%latestnewsfile%[36m %multibuild%[34... [0m
-  )
-  if %latestnewsinfileandanotherscreen% == 0 echo. [34mChangements dans les derniers builds: [0m
-  call :pause 2
-  call :multiNotes %version% %multibuild% %latestnewsinfileandanotherscreen%
-  if %latestnewsinfileandanotherscreen% == 1 (
-    echo ^pause>>%latestnewsfile%
-    echo ^exit>>%latestnewsfile%
-    @start /wait "Latest news" %latestnewsfile%
+  if %build% GTR 0 (
+    echo. [96mNouveau build découvert pour la version [95m%version%[96m: [95m%latestbuildonline%[0m
+    call :playsound
+    call :pause 3
+    if %latestnewsinfileandanotherscreen% == 1 (
+      (
+        echo ^@echo off
+        echo ^chcp 65001 ^> nul
+        echo ^chcp 1252 ^> nul
+        echo ^echo Nouveautés
+      )>%latestnewsfile%
+      echo. [34mÉcriture dans le fichier [35m%latestnewsfile%[36m %multibuild%[34... [0m
+    )
+    if %latestnewsinfileandanotherscreen% == 0 echo. [34mChangements dans les derniers builds: [0m
+    call :pause 2
+    call :multiNotes %version% %multibuild% %latestnewsinfileandanotherscreen%
+    if %latestnewsinfileandanotherscreen% == 1 (
+      echo ^pause>>%latestnewsfile%
+      echo ^exit>>%latestnewsfile%
+      @start /wait "Latest news" %latestnewsfile%
+    )
   )
   call :pause 2
   call :downloadpapermc %version% %latestbuildonline%
@@ -107,6 +116,7 @@ if %latestbuildonline% GTR %build% (
   cls
   call :title 1
   rem goto firsttime
+
 )
 
 if %latestbuildonline% == %build% (
@@ -178,14 +188,20 @@ echo. [33mVérification local...[0m
 FOR %%i IN (paper-*.jar) do (
   if not %%i == %fichierActuel% (
     for /f "tokens=2,3 delims=-" %%a in ("%%~ni") do (
-      if %%b GTR %bu% (
-        if %firsttime% == 0 echo. [33mNouveau build découvert: [35m%%i[0m
-        if %firsttime% == 1 echo. [33mVersion découverte: [35m%%i[0m
-        set version=%%a
-        set build=%%b
-        set newversiondetected=1
+      if %%a EQU %version% (
+        if %%b GTR %bu% (
+          if %firsttime% == 0 echo. [33mNouveau build découvert localement: [35m%%i[0m
+          if %firsttime% == 1 echo. [33mVersion découverte localement: [35m%%i[0m
+          set version=%%a
+          set build=%%b
+          set newversiondetected=1
+        )
+        if %%b LSS %bu% (
+          echo. [31mEffacement d'ancienne version: [35m%%i[0m
+          del "%BINDIR%%%i"
+        )
       )
-      if %%b LSS %bu% (
+      if not %%a == %version% (
         echo. [31mEffacement d'ancienne version: [35m%%i[0m
         del "%BINDIR%%%i"
       )
@@ -207,10 +223,15 @@ for /F "tokens=2 delims=[" %%a in (%commande%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
     for %%c in (%%b) do (
       call :setmultibuilds %bd% %%c
-      set bd=%%c 
+      set bd=%%c
     )
   )
 )
+::trouver meilleur moyen au changement de version et plus petit build.
+::if %bd% NEQ %build% (
+::  echo. [31mReset du build n est pas pareil: [35m %bd%  %build%[0m
+::  set build=0
+::)
 
 EXIT /B %bd%
 ::check online end
@@ -220,6 +241,7 @@ setlocal EnableDelayedExpansion
 set vers=%1
 set bd=%2
 set latest=%3
+if %bd% == 0 EXIT /b 2
 if %latest% == 1 echo ^echo [33m%bd%[0m:>>%latestnewsfile%
 if %latest% == 0 echo. [35m%bd%[34m: [0m
 
@@ -284,7 +306,7 @@ set b=%2
 echo.
 echo. [34mDémarrage du serveur paper [36m%v% %b%[34m...[0m
 echo.
-call :pause 3
+call :pause 5
 java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%v%-%b%.jar nogui
 endlocal
 pause
@@ -333,6 +355,7 @@ EXIT /B 0
 if %2 GTR %1 (
   if %multibuild% GTR 0 set multibuild=%multibuild%-%2
   if %multibuild% EQU 0 set multibuild=%2
+  
 )
 EXIT /B 0
 
@@ -360,6 +383,7 @@ EXIT /B 0
 ping 127.0.0.1 -n %1 > nul
 EXIT /B 0
 :title
+cls
 echo.
 echo. [33m***********************************[0m
 echo. [33m***** [35mFlash [36mServer loader V%vers% [33m******[0m
