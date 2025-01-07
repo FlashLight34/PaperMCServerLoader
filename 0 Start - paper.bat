@@ -1,15 +1,15 @@
 @echo off
 set dontsearch=0
-
+set buildsonlinenumbers=0
 :firsttime
 chcp 65001 > nul
 chcp 1252 > nul
 rem config
 rem %WINDIR%\media\Alarm*.wav
 rem %WINDIR%\media\Ring*.wav
-set vers=9
+set vers=10
 set newversionfound_randomsong=%WINDIR%\media\Alarm*.wav
-set version=1.20.6
+set version=1.21.4
 set dontprompt=1
 set latestnewsinfileandanotherscreen=1
 set title=Serveur de Nini et Jo
@@ -24,6 +24,10 @@ CD /D "%BINDIR%"
 Title Flash Server loader V%vers%
 
 rem test
+rem echo. test mode:
+rem call :checkonlinebuild 1.21.1 0
+rem call :pause 5
+rem call :checkonlinebuild 1.21.3 0
 rem call :descriptions 1.19.2 244 0
 rem call :downloadpapermc 1.19.2 191
 rem echo fin
@@ -82,6 +86,12 @@ set latestbuildonline=0
 call :checkonlinebuild %version% %build%
 set latestbuildonline=%errorlevel%
 
+
+if %latestbuildonline% EQU -1 (
+  echo. [33mFermeture...[0m
+  call :pause 3
+  exit /b 0
+)
 ::ici etait checkonline
 set telecharge=n
 
@@ -133,16 +143,29 @@ if %newversiondetected% == 1 (
     del "%BINDIR%%fichierActuel%"
   )
   call :pause 3
-  if %firsttime% == 0 echo. [33mEnregistrement de la nouvelle version...[0m
-  if %firsttime% == 1 echo. [33mEnregistrement de la version...[0m 
+  if %firsttime% == 0 echo. [33mEnregistrement de la nouvelle version... {[35m%version% %build%[33m}[0m
+  if %firsttime% == 1 echo. [33mEnregistrement de la version... {[35m%version% %build%[33m}[0m 
   echo %version% %build%>%versionfile%
-rem set firsttime=1
+  set firsttime=1
 )
 if %firsttime% == 1 (
-rem call :pause 5
-rem cls
-rem goto firsttime
+  call :pause 5
+  cls
+  goto firsttime
 )
+
+rem verifier si le ficher exist avant de le lancer
+if not exist %BINDIR%%fichierActuel% (
+  call :pause 3
+  echo. [31mErreur fichier %fichierActuel% introuvable![0m
+  call :pause 3
+  echo. [33mUn instant, on va rééssayer...[0m
+  del "%BINDIR%%versionfile%"
+  call :pause 3
+  cls
+  goto firsttime
+)
+
 call :pause 3
 ::start server
 call :startserver %version% %build%
@@ -213,20 +236,30 @@ EXIT /B 0
 ::local check end
 ::check online
 :checkonlinebuild
-echo. [33mVérification en ligne sur [34mpapermc.io[33m...[0m
 set ve=%1
 set bd=%2
-set multibuild=0
-set commande='curl -s "https://api.papermc.io/v2/projects/paper/versions/%ve%" -H "accept: application/json"'
+echo. [33mVérification en ligne sur [34mpapermc.io[33m... ([35m%ve%[33m)[0m
 
+set multibuild=0
+set commande='curl -s --ssl-no-revoke "https://api.papermc.io/v2/projects/paper/versions/%ve%" -H "accept: application/json"'
 for /F "tokens=2 delims=[" %%a in (%commande%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
     for %%c in (%%b) do (
+      set /a buildsonlinenumbers+=1
       call :setmultibuilds %bd% %%c
       set bd=%%c
     )
   )
 )
+if %buildsonlinenumbers% LSS 1 (
+  echo.
+  echo. [31mErreur, verifiez que la version [35m%ve%[31m existe![0m
+  echo.
+  call :pause 5
+  EXIT /B -1
+)
+call :pause 3
+echo. [33mNombre total de builds pour la version [35m%ve%[33m est de [35m%buildsonlinenumbers%
 ::trouver meilleur moyen au changement de version et plus petit build.
 ::if %bd% NEQ %build% (
 ::  echo. [31mReset du build n est pas pareil: [35m %bd%  %build%[0m
@@ -245,7 +278,7 @@ if %bd% == 0 EXIT /b 2
 if %latest% == 1 echo ^echo [33m%bd%[0m:>>%latestnewsfile%
 if %latest% == 0 echo. [35m%bd%[34m: [0m
 
-set com='curl -s "https://api.papermc.io/v2/projects/paper/versions/%vers%/builds/%bd%" -H "accept: application/json"'
+set com='curl -s --ssl-no-revoke "https://api.papermc.io/v2/projects/paper/versions/%vers%/builds/%bd%" -H "accept: application/json"'
 for /F "tokens=2 delims=[" %%a in (%com%) do (
   for /F "tokens=1 delims=]" %%b in ("%%a") do (
     for /F "tokens=4* delims=:" %%c in ("%%b") do (
@@ -307,6 +340,7 @@ echo.
 echo. [34mDémarrage du serveur paper [36m%v% %b%[34m...[0m
 echo.
 call :pause 5
+rem ajouter --forceUpgrade au bout
 java -Xmx2048M -Xms2048M -Dlog4j.configurationFile=log4j2.xml -jar paper-%v%-%b%.jar nogui
 endlocal
 pause
@@ -328,6 +362,7 @@ IF %ERRORLEVEL% EQU 2 set telecharge=n
 IF %ERRORLEVEL% EQU 1 set telecharge=o
 IF %ERRORLEVEL% EQU 0 set telecharge=n
 
+
 :bypasspromptdownload
 
 rem set fich=paper-%version%-%latestbuildonline%.jar
@@ -336,7 +371,7 @@ set url=https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%buil
 IF %telecharge% == o (
   rem set url=https://api.papermc.io/v2/projects/paper/versions/%version%/builds/%latestbuildonline%/downloads/%fich%
   echo. [36mTéléchargement en cour...[0m
-  curl -s -A "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64)" -H "accept: application/json" -L "%url%" -o "%BINDIR%%fich%"
+  curl -s --ssl-no-revoke -A "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; WOW64)" -H "accept: application/json" -L "%url%" -o "%BINDIR%%fich%"
   call :pause 5
   if exist %BINDIR%%fich% (
     echo. [36mNouveau fichier [35m%fich% [36mtélécharger![0m
@@ -350,7 +385,7 @@ IF %telecharge% == o (
   )
 )
 EXIT /B 0
-::End donwloadpapermc
+::End downloadpapermc
 :setmultibuilds
 if %2 GTR %1 (
   if %multibuild% GTR 0 set multibuild=%multibuild%-%2
